@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bluey face preview</title>
+<style>
+:root{color-scheme:dark;--bg:#000;--fg:#e8eefc;--chip:#141a33;--chip-on:#2f5bff}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#stage{position:relative;flex:1;margin:10px;border-radius:34px;display:grid;place-items:center;touch-action:none;user-select:none;
+  box-shadow:inset 0 0 0 0 transparent;transition:box-shadow .18s}
+svg{width:min(94%,calc((100vh - 140px) * 2.1));height:auto;overflow:visible}
+#pill{position:absolute;top:16px;left:18px;padding:3px 10px;border-radius:99px;font-weight:700;font-size:12px;color:#fff;display:none}
+.lid{transform-box:fill-box;transform-origin:top;transform:scaleY(var(--lid,.35));transition:transform .12s ease-out}
+.pupil{transition:transform .1s ease-out}
+#zz,#closedL,#closedR{display:none}
+#hint{padding:0 18px 6px;color:#8fa0d8}
+#bar{display:flex;gap:8px;flex-wrap:wrap;padding:0 10px 12px}
+button{font:inherit;color:var(--fg);background:var(--chip);border:0;border-radius:99px;padding:8px 14px;cursor:pointer}
+button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+button[aria-pressed=true]{background:var(--chip-on)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <span id="pill"></span>
+  <svg id="face" viewBox="0 0 400 190" aria-label="Bluey">
+    <defs>
+      <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="190">
+        <stop offset="0" stop-color="#c7e0ff"/><stop offset=".5" stop-color="#5c85ff"/><stop offset="1" stop-color="#1a33e6"/>
+      </linearGradient>
+      <clipPath id="cl"><circle cx="135" cy="108" r="40"/></clipPath>
+      <clipPath id="cr"><circle cx="265" cy="108" r="40"/></clipPath>
+    </defs>
+    <path d="M0 190A200 190 0 0 1 400 190Z" fill="url(#g)"/>
+    <polygon fill="#141f8c" points="200,15 202.6,22.4 210.5,22.6 204.3,27.4 206.5,34.9 200,30.5 193.5,34.9 195.7,27.4 189.5,22.6 197.4,22.4"/>
+    <g id="brows" fill="none" stroke="#141f8c" stroke-width="5" stroke-linecap="round">
+      <path d="M100 66Q135 44 170 60"/><path d="M230 60Q265 44 300 66"/>
+    </g>
+    <g clip-path="url(#cl)"><circle cx="135" cy="108" r="40" fill="#fff"/>
+      <g class="pupil" id="pl"><circle cx="135" cy="108" r="20" fill="#141f8c"/><circle cx="129" cy="102" r="5.5" fill="#fff"/></g>
+      <rect class="lid" x="95" y="68" width="80" height="80" fill="url(#g)"/></g>
+    <g clip-path="url(#cr)"><circle cx="265" cy="108" r="40" fill="#fff"/>
+      <g class="pupil" id="pr"><circle cx="265" cy="108" r="20" fill="#141f8c"/><circle cx="259" cy="102" r="5.5" fill="#fff"/></g>
+      <rect class="lid" x="225" y="68" width="80" height="80" fill="url(#g)"/></g>
+    <path id="closedL" d="M100 112Q135 128 170 112" fill="none" stroke="#141f8c" stroke-width="5" stroke-linecap="round"/>
+    <path id="closedR" d="M230 112Q265 128 300 112" fill="none" stroke="#141f8c" stroke-width="5" stroke-linecap="round"/>
+    <ellipse cx="78" cy="150" rx="22" ry="12" fill="#ff7ac8" opacity=".35"/>
+    <ellipse cx="322" cy="150" rx="22" ry="12" fill="#ff7ac8" opacity=".35"/>
+    <ellipse id="mouth" cx="200" cy="156" rx="12" ry="8" fill="#141f8c"/>
+    <text id="zz" x="345" y="40" fill="#fff" opacity=".8" font-size="22" font-weight="700">z Z</text>
+  </svg>
+</div>
+<div id="hint">Move the pointer to make the eyes follow. Hold the black area to listen.</div>
+<div id="bar"></div>
+<script>
+const CFG = {
+  idle:{lid:.35}, listening:{lid:0,ring:'#1f47ff',w:22,label:"I'm all ears"},
+  thinking:{lid:0,ring:'#a855f7',w:10,label:'Thinking'}, researching:{lid:0,ring:'#f59e0b',w:10,label:'Researching'},
+  replying:{lid:0,ring:'#ec4899',w:10,label:'Replying'}, pointing:{lid:0,ring:'#22c55e',w:10,label:'Pointing'},
+  sleeping:{lid:1}
+};
+const $ = id => document.getElementById(id);
+const stage=$('stage'), face=$('face'), pill=$('pill'), bar=$('bar');
+let state='idle', blinking=false, timers=[];
+
+function setState(s){
+  state=s; const c=CFG[s];
+  face.style.setProperty('--lid', blinking?1:c.lid);
+  stage.style.boxShadow = c.ring ? `inset 0 0 0 ${c.w}px ${c.ring}` : 'inset 0 0 0 0 transparent';
+  pill.style.display = c.label ? 'block':'none'; pill.textContent=c.label||''; pill.style.background=c.ring||'';
+  const asleep=s==='sleeping';
+  $('zz').style.display=$('closedL').style.display=$('closedR').style.display=asleep?'block':'none';
+  $('brows').setAttribute('transform', ['listening','thinking','researching'].includes(s)?'translate(0,-6)':'');
+  $('mouth').setAttribute('ry', s==='replying'?14:8);
+  [...bar.children].forEach(b=>b.setAttribute('aria-pressed', b.dataset.s===s));
+}
+Object.keys(CFG).forEach(s=>{
+  const b=document.createElement('button'); b.textContent=s; b.dataset.s=s; b.onclick=()=>{clear();setState(s)}; bar.append(b);
+});
+function clear(){timers.forEach(clearTimeout);timers=[]}
+
+// eyes follow pointer
+addEventListener('pointermove',e=>{
+  const r=face.getBoundingClientRect();
+  const nx=Math.max(-1,Math.min(1,((e.clientX-r.left)/r.width-.5)*2));
+  const ny=Math.max(-1,Math.min(1,((e.clientY-r.top)/r.height-.5)*2));
+  const t=`translate(${nx*14}px,${ny*12}px)`;
+  $('pl').style.transform=$('pr').style.transform=t;
+});
+
+// hold to talk: listening -> thinking -> replying -> idle
+stage.addEventListener('pointerdown',()=>{clear();setState('listening')});
+const release=()=>{ if(state!=='listening')return;
+  setState('thinking');
+  timers.push(setTimeout(()=>setState('replying'),1400), setTimeout(()=>setState('idle'),3200)); };
+stage.addEventListener('pointerup',release); stage.addEventListener('pointercancel',release);
+
+// blink
+(function blink(){ setTimeout(()=>{ blinking=true; setState(state); setTimeout(()=>{blinking=false;setState(state);blink()},120)},2500+Math.random()*2500) })();
+setState('idle');
+</script>
+</body>
+</html>
