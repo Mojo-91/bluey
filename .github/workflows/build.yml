@@ -1,0 +1,60 @@
+name: Build Bluey
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build Bluey.exe
+        working-directory: Windows
+        run: |
+          pip install -r requirements.txt pyinstaller
+          pyinstaller --noconfirm --onefile --windowed --name Bluey --collect-all zeroconf --hidden-import keyring.backends.Windows --hidden-import mss.windows launcher.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: Windows/dist/Bluey.exe
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+      - name: Build Bluey.apk
+        working-directory: Android
+        run: gradle assembleDebug --no-daemon
+      - run: cp Android/app/build/outputs/apk/debug/app-debug.apk Bluey.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: Bluey.apk
+
+  release:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Bluey (latest build)
+          files: |
+            out/Bluey.exe
+            out/Bluey.apk
