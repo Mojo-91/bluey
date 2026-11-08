@@ -5,9 +5,13 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import org.json.JSONObject
 import java.io.OutputStream
+import java.net.Inet4Address
 import java.net.InetSocketAddress
+import java.net.NetworkInterface
 import java.net.Socket
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 const val PORT = 47474
@@ -42,6 +46,7 @@ class Link(
         if (running) return
         running = true
         discover()
+        scanLoop()
         thread(isDaemon = true) {
             while (running) {
                 val host = manualHost.ifEmpty { found }
@@ -82,10 +87,42 @@ class Link(
                     }
                 }
             }
-        } catch (_: Exception) { }
+        } catch (_: Exception) { if (manualHost.isEmpty()) found = null }
         out = null
         socket = null
         onConn(false)
+    }
+
+    /** If Bonjour finds nothing, look for the PC on the phone's own Wi-Fi (same /24) by trying the port. */
+    private fun scanLoop() = thread(isDaemon = true) {
+        while (running) {
+            Thread.sleep(4000)
+            if (running && found == null && manualHost.isEmpty() && socket == null) runCatching { scan() }
+        }
+    }
+
+    private fun scan() {
+        val me = NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback }
+            .flatMap { it.interfaceAddresses }
+            .map { it.address }
+            .filterIsInstance<Inet4Address>()
+            .firstOrNull { it.isSiteLocalAddress }?.hostAddress ?: return
+        val prefix = me.substringBeforeLast('.')
+        val hit = AtomicReference<String?>(null)
+        val pool = Executors.newFixedThreadPool(48)
+        for (i in 1..254) {
+            val ip = "$prefix.$i"
+            if (ip == me) continue
+            pool.execute {
+                if (hit.get() == null) {
+                    try { Socket().use { it.connect(InetSocketAddress(ip, PORT), 300) }; hit.compareAndSet(null, ip) } catch (_: Exception) { }
+                }
+            }
+        }
+        pool.shutdown()
+        pool.awaitTermination(15, TimeUnit.SECONDS)
+        hit.get()?.let { found = it }
     }
 
     private fun discover() {

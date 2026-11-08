@@ -21,6 +21,7 @@ class Panel(QWidget):
     new_code_requested = pyqtSignal()
     paused_changed = pyqtSignal(bool)
     autostart_changed = pyqtSignal(bool)
+    firewall_requested = pyqtSignal()
 
     def __init__(self, code: str, has_key: bool, autostart: bool) -> None:
         super().__init__()
@@ -67,6 +68,11 @@ class Panel(QWidget):
         self.auto_cb.toggled.connect(self.autostart_changed)
         lay.addWidget(self.pause_cb)
         lay.addWidget(self.auto_cb)
+
+        fw = QPushButton("Phone can't connect? Fix Windows Firewall")
+        fw.setObjectName("quiet")
+        fw.clicked.connect(self.firewall_requested)
+        lay.addWidget(fw)
 
         row2 = QHBoxLayout()
         newc = QPushButton("New code")

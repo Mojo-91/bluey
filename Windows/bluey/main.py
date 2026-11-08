@@ -83,6 +83,7 @@ class Brain(QObject):
         self.panel.new_code_requested.connect(self.new_code)
         self.panel.paused_changed.connect(self.set_paused)
         self.panel.autostart_changed.connect(config.set_autostart)
+        self.panel.firewall_requested.connect(self.fix_firewall)
 
         self.bridge.msg.connect(self.on_msg)
         self.bridge.conn.connect(self.on_conn)
@@ -159,6 +160,15 @@ class Brain(QObject):
             self.panel.set_key_state(True)
         except Exception as e:
             self.panel.set_key_state(False, f"Couldn't save the key: {e}")
+
+    def fix_firewall(self) -> None:
+        """One UAC prompt, then Windows lets the phone reach Bluey's port."""
+        import ctypes
+        args = f'advfirewall firewall add rule name="Bluey" dir=in action=allow protocol=TCP localport={PORT} profile=any'
+        try:
+            ctypes.windll.shell32.ShellExecuteW(None, "runas", "netsh", args, None, 0)
+        except Exception as e:
+            QMessageBox.warning(None, "Bluey", f"Couldn't open the firewall prompt: {e}")
 
     def new_code(self) -> None:
         self.panel.set_code(config.new_code())

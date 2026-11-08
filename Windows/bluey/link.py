@@ -110,7 +110,11 @@ class Server:
             c.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             c.settimeout(8)
             f = c.makefile("r", encoding="utf-8", newline="\n")
-            if not self._check(f.readline(512)):
+            line = f.readline(512)
+            if not line:              # connected and left without a word: a probe, not a wrong code
+                c.close()
+                return
+            if not self._check(line):
                 time.sleep(1.0)
                 c.sendall(b'{"t":"denied"}\n')
                 c.close()

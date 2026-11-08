@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -101,44 +102,31 @@ fun FaceScreen(m: Model) {
             ) { Text("≡", color = Color.White, fontSize = 18.sp) }
         }
 
-        // pairing screen
+        // pairing screen: sits at the TOP so the keyboard never covers it
         if (!m.connected) {
             Column(
-                Modifier.align(Alignment.BottomCenter).padding(24.dp)
-                    .background(Color(0xFF141A33), RoundedCornerShape(14.dp)).padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                Modifier.align(Alignment.TopCenter).padding(top = 10.dp, start = 12.dp, end = 12.dp)
+                    .background(Color(0xFF141A33), RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (m.needsCode) {
-                    Text(
-                        if (m.wrongCode) "Wrong code. Check the Bluey window on your PC." else "Type the 6-digit code shown in Bluey on your PC",
-                        color = if (m.wrongCode) Color(0xFFFF8A8A) else Color(0xFFDFE6FF), fontSize = 13.sp
-                    )
-                    var code by remember { mutableStateOf("") }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BasicTextField(
-                            code, { v -> code = v.filter { it.isDigit() }.take(6) }, singleLine = true,
-                            textStyle = TextStyle(color = Color.White, fontSize = 22.sp, letterSpacing = 4.sp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                            modifier = Modifier.width(150.dp).padding(8.dp)
-                        )
+                Text(
+                    when {
+                        m.wrongCode -> "Wrong code. Check the Bluey window on your PC."
+                        m.needsCode -> "Type the 6-digit code shown in Bluey on your PC"
+                        else -> "Looking for your PC… same Wi-Fi"
+                    },
+                    color = if (m.wrongCode) Color(0xFFFF8A8A) else Color(0xFFDFE6FF), fontSize = 13.sp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (m.needsCode) {
+                        var code by remember { mutableStateOf("") }
+                        Entry(code, { v -> code = v.filter { it.isDigit() }.take(6) }, "123456", 130.dp, KeyboardType.NumberPassword)
                         TextButton({ if (code.length == 6) m.submitCode(code) }) { Text("Connect") }
                     }
-                } else {
-                    Text("Looking for your PC… same Wi-Fi", color = Color(0xFF8FA0D8), fontSize = 13.sp)
-                }
-                if (m.showManual) {
-                    var ip by remember { mutableStateOf(m.link.manualHost) }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BasicTextField(
-                            ip, { ip = it }, singleLine = true,
-                            textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                            decorationBox = { inner ->
-                                if (ip.isEmpty()) Text("Can't find it? PC IP from the Bluey window", color = Color.Gray, fontSize = 13.sp)
-                                inner()
-                            },
-                            modifier = Modifier.width(260.dp).padding(8.dp)
-                        )
+                    if (m.showManual) {
+                        var ip by remember { mutableStateOf(m.link.manualHost) }
+                        Entry(ip, { ip = it }, "PC address, e.g. 192.168.1.23", 230.dp, KeyboardType.Uri)
                         TextButton({ m.link.manualHost = ip }) { Text("Use") }
                     }
                 }
@@ -146,6 +134,27 @@ fun FaceScreen(m: Model) {
         }
 
         if (m.showTranscript) Transcript(m)
+    }
+}
+
+/** A text box you can actually see: bordered, white text, white cursor. */
+@Composable
+fun Entry(value: String, onChange: (String) -> Unit, hint: String, width: androidx.compose.ui.unit.Dp, type: KeyboardType) {
+    Box(
+        Modifier.width(width).background(Color(0xFF0B1020), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFF3A4580), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        BasicTextField(
+            value, onChange, singleLine = true,
+            textStyle = TextStyle(color = Color.White, fontSize = 18.sp, letterSpacing = if (type == KeyboardType.NumberPassword) 3.sp else 0.sp),
+            cursorBrush = SolidColor(Color.White),
+            keyboardOptions = KeyboardOptions(keyboardType = type),
+            decorationBox = { inner ->
+                if (value.isEmpty()) Text(hint, color = Color(0xFF6F7BAA), fontSize = 14.sp)
+                inner()
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
